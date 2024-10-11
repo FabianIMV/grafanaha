@@ -1,0 +1,135 @@
+#1 Create a namespace for your Grafana HA setup:
+
+kubectl create namespace grafana-ha
+kubectl config set-context --current --namespace=grafana-ha
+
+#2 Create a file named postgres-deployment.yaml:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:13
+        env:
+        - name: POSTGRES_DB
+          value: grafana
+        - name: POSTGRES_USER
+          value: grafana
+        - name: POSTGRES_PASSWORD
+          value: grafanapassword
+        ports:
+        - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+
+# luego kubectl apply -f postgres-deployment.yaml
+#3 Create a file named grafana-config.yaml:
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+data:
+  grafana.ini: |
+    [database]
+    type = postgres
+    host = postgres:5432
+    name = grafana
+    user = grafana
+    password = grafanapassword
+
+    [server]
+    http_port = 3001
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+type: Opaque
+stringData:
+  admin-password: adminpassword
+
+#kubectl apply -f grafana-config.yaml
+
+#4 Create a file named grafana-deployment.yaml:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        ports:
+        - containerPort: 3001
+        volumeMounts:
+        - name: config
+          mountPath: /etc/grafana/grafana.ini
+          subPath: grafana.ini
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secret
+              key: admin-password
+      volumes:
+      - name: config
+        configMap:
+          name: grafana-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3001
+      targetPort: 3001
+  type: LoadBalancer
+
+#kubectl apply -f grafana-deployment.yaml
+
+# 5 Verify the setup:
+
+kubectl get pods
+kubectl get services
+
+#6 Access Grafana:
+http://localhost:3001/login
+
+Use the EXTERNAL-IP and port 3001 to access Grafana in your browser.
+
+If you're running this locally or in an environment that doesn't support LoadBalancer, you can use port-forwarding:
+
+bash
+Copy Code
+kubectl port-forward service/grafana 3001:3001

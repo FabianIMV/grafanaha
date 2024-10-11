@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+data:
+  grafana.ini: |
+    [database]
+    type = postgres
+    host = postgres:5432
+    name = grafana
+    user = grafana
+    password = grafanapassword
+
+    [server]
+    http_port = 3001
+
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: PostgreSQL
+      type: postgres
+      url: postgres:5432
+      database: grafana
+      user: grafana
+      secureJsonData:
+        password: grafanapassword
+      jsonData:
+        sslmode: "disable"
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus:9090
+      access: proxy
+    - name: Loki
+      type: loki
+      url: http://loki:3100
+      access: proxy
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+type: Opaque
+stringData:
+  admin-password: adminpassword
