@@ -2,14 +2,15 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: prometheus-config
+  namespace: grafana-ha
 data:
   prometheus.yml: |
     global:
       scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'cluster-promehteus-thanos'
     scrape_configs:
       - job_name: 'prometheus'
         static_configs:
           - targets: ['localhost:9090']
-      - job_name: 'kubernetes-pods'
-        kubernetes_sd_configs:
-          - role: pod
